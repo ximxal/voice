@@ -52,6 +52,10 @@ h2 {
     transform: scale(0.92);
 }
 
+.circle-btn.stop {
+    background: linear-gradient(145deg, #ff6f91, #ff4d6d);
+}
+
 #result {
     margin-top: 25px;
     font-size: 22px;
@@ -87,14 +91,8 @@ canvas {
 <div class="wrapper">
     <h2>Voice Trainer</h2>
 
-    <button 
-        class="circle-btn"
-        onmousedown="startListening()"
-        ontouchstart="startListening()"
-        onmouseup="stopListening()"
-        ontouchend="stopListening()"
-    >
-        กดค้างเพื่อฝึก
+    <button class="circle-btn" id="toggleBtn" onclick="toggleListening()">
+        เริ่มฝึก
     </button>
 
     <div id="result">Ready</div>
@@ -114,17 +112,27 @@ let stream;
 
 let canvas = document.getElementById("graph");
 let ctx = canvas.getContext("2d");
-
 canvas.width = 400;
 canvas.height = 90;
 
 const target = 440;
 
-async function startListening() {
-    if (isListening) return;
+async function toggleListening() {
+    if (!isListening) {
+        startListening();
+    } else {
+        stopListening();
+    }
+}
 
+async function startListening() {
     isListening = true;
-    document.getElementById("result").innerText = "กำลังกดอยู่...";
+
+    const btn = document.getElementById("toggleBtn");
+    btn.innerText = "หยุด";
+    btn.classList.add("stop");
+
+    document.getElementById("result").innerText = "กำลังฟัง...";
 
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -140,19 +148,17 @@ async function startListening() {
 }
 
 function stopListening() {
-    if (!isListening) return;
-
     isListening = false;
+
+    const btn = document.getElementById("toggleBtn");
+    btn.innerText = "เริ่มฝึก";
+    btn.classList.remove("stop");
+
     document.getElementById("result").innerText = "หยุดแล้ว";
     document.getElementById("meterFill").style.width = "0%";
 
-    if (audioContext) {
-        audioContext.close();
-    }
-
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-    }
+    if (audioContext) audioContext.close();
+    if (stream) stream.getTracks().forEach(track => track.stop());
 
     cancelAnimationFrame(animationId);
 }
@@ -207,11 +213,9 @@ function autoCorrelate(buffer, sampleRate) {
 
     for (let offset = 8; offset < 1000; offset++) {
         let correlation = 0;
-
         for (let i = 0; i < SIZE - offset; i++) {
             correlation += buffer[i] * buffer[i + offset];
         }
-
         correlation = correlation / SIZE;
 
         if (correlation > bestCorrelation) {
