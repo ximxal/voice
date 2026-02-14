@@ -49,7 +49,7 @@ h2 {
 }
 
 .circle-btn:active {
-    transform: scale(0.95);
+    transform: scale(0.92);
 }
 
 #result {
@@ -86,26 +86,47 @@ canvas {
 
 <div class="wrapper">
     <h2>Voice Trainer</h2>
-    <button class="circle-btn" onclick="start()">Start</button>
+
+    <button 
+        class="circle-btn"
+        onmousedown="startListening()"
+        ontouchstart="startListening()"
+        onmouseup="stopListening()"
+        ontouchend="stopListening()"
+    >
+        กดค้างเพื่อฝึก
+    </button>
+
     <div id="result">Ready</div>
+
     <div class="meter">
         <div class="meter-fill" id="meterFill"></div>
     </div>
+
     <canvas id="graph"></canvas>
 </div>
 
 <script>
 let audioContext, analyser, microphone, dataArray;
+let isListening = false;
+let animationId;
+let stream;
+
 let canvas = document.getElementById("graph");
 let ctx = canvas.getContext("2d");
 
 canvas.width = 400;
 canvas.height = 90;
 
-const target = 440; // A4 note
+const target = 440;
 
-async function start() {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+async function startListening() {
+    if (isListening) return;
+
+    isListening = true;
+    document.getElementById("result").innerText = "กำลังกดอยู่...";
+
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioContext.createAnalyser();
@@ -113,15 +134,33 @@ async function start() {
 
     microphone.connect(analyser);
     analyser.fftSize = 2048;
-
     dataArray = new Float32Array(analyser.fftSize);
 
     detectPitch();
 }
 
-function detectPitch() {
-    analyser.getFloatTimeDomainData(dataArray);
+function stopListening() {
+    if (!isListening) return;
 
+    isListening = false;
+    document.getElementById("result").innerText = "หยุดแล้ว";
+    document.getElementById("meterFill").style.width = "0%";
+
+    if (audioContext) {
+        audioContext.close();
+    }
+
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+
+    cancelAnimationFrame(animationId);
+}
+
+function detectPitch() {
+    if (!isListening) return;
+
+    analyser.getFloatTimeDomainData(dataArray);
     let pitch = autoCorrelate(dataArray, audioContext.sampleRate);
 
     drawGraph(dataArray);
@@ -135,7 +174,7 @@ function detectPitch() {
         document.getElementById("meterFill").style.width = percent + "%";
     }
 
-    requestAnimationFrame(detectPitch);
+    animationId = requestAnimationFrame(detectPitch);
 }
 
 function drawGraph(data) {
